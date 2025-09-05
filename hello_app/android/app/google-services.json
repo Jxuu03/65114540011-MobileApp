@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "207351316785",
+    "project_id": "demoflutter-d8cab",
+    "storage_bucket": "demoflutter-d8cab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:207351316785:android:c117ad8dfcd1f006c47010",
+        "android_client_info": {
+          "package_name": "com.example.hello_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmrpg4cg_1NpYFo9d2qlIIWlxfplBDigI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
