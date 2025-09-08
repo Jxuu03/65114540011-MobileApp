@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import '../controller/teamController.dart';
 
 class NewPage extends StatelessWidget {
-  final TeamController teamCtrl = Get.put(TeamController()); // instead of Get.find()
+  const NewPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Team Preview")),
-      body: Obx(() => Column(
-        children: [
-          Text("Your Pokémon Team:")
-        ],
-      )),
+      appBar: AppBar(title: const Text("Center Text Page")),
+      body: const Center(
+        child: Text(
+          "New page, to be continued!",
+          style: TextStyle(fontSize: 24),
+        ),
+      ),
     );
   }
 }
