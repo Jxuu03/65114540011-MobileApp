@@ -39,6 +39,7 @@ dependencies:
   cloud_firestore: ^5.6.11
   get: ^4.7.2
   get_storage: ^2.1.1
+  pocketbase: ^0.23.0+1
 
 dev_dependencies:
   flutter_test:

@@ -11,7 +11,7 @@ class TeamPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Select Your Team Member")),
+      appBar: AppBar(title: const Text("Select Your Pokémon Team")),
       body: Column(
         children: [
           // Show Current Team
@@ -22,7 +22,6 @@ class TeamPage extends StatelessWidget {
               color: Colors.grey[200],
               child: Row(
                 children: [
-                  // Scrollable chips
                   Expanded(
                     child: ListView(
                       scrollDirection: Axis.horizontal,
@@ -31,7 +30,12 @@ class TeamPage extends StatelessWidget {
                             (member) => Padding(
                               padding: const EdgeInsets.all(4.0),
                               child: Chip(
-                                label: Text(member),
+                                avatar: Image.network(
+                                  member['imageUrl']!,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                label: Text(member['name']!),
                                 onDeleted: () => teamCtrl.removeMember(member),
                               ),
                             ),
@@ -39,7 +43,6 @@ class TeamPage extends StatelessWidget {
                           .toList(),
                     ),
                   ),
-                  // Reset button on the right
                   IconButton(
                     icon: const Icon(Icons.refresh, color: Colors.red),
                     onPressed: () => teamCtrl.team.clear(),
@@ -50,8 +53,7 @@ class TeamPage extends StatelessWidget {
             ),
           ),
 
-          // Reset Button
-          const SizedBox(height: 10),
+          const Divider(),
 
           // Navigate to preview screen
           Padding(
@@ -62,12 +64,14 @@ class TeamPage extends StatelessWidget {
             ),
           ),
 
-          const Divider(),
-
           // Display Member List
           Expanded(
             child: Obx(() {
               final members = teamCtrl.members;
+              if (members.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
               return GridView.builder(
                 padding: const EdgeInsets.all(8),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -79,22 +83,25 @@ class TeamPage extends StatelessWidget {
                 itemCount: members.length,
                 itemBuilder: (context, index) {
                   final member = members[index];
-                  return Obx(() {
-                    final isSelected = teamCtrl.team.contains(member);
-                    return Card(
-                      child: ListTile(
-                        leading: CircleAvatar(child: Text('${index + 1}')),
-                        title: Text(member),
-                        trailing: Icon(
-                          isSelected
-                              ? Icons.check_circle
-                              : Icons.add_circle_outline,
-                          color: isSelected ? Colors.green : Colors.grey,
-                        ),
-                        onTap: () => teamCtrl.toggleMember(member),
+                  final isSelected = teamCtrl.team.contains(member);
+
+                  return Card(
+                    child: ListTile(
+                      leading: Image.network(
+                        member['imageUrl']!,
+                        width: 40,
+                        height: 40,
                       ),
-                    );
-                  });
+                      title: Text(member['name']!),
+                      trailing: Icon(
+                        isSelected
+                            ? Icons.check_circle
+                            : Icons.add_circle_outline,
+                        color: isSelected ? Colors.green : Colors.grey,
+                      ),
+                      onTap: () => teamCtrl.toggleMember(member),
+                    ),
+                  );
                 },
               );
             }),

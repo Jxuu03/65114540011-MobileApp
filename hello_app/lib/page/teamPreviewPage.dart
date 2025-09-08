@@ -64,12 +64,13 @@ class _TeamPreviewPageState extends State<TeamPreviewPage> {
                         vertical: 6,
                       ),
                       child: ListTile(
-                        leading: Icon(
-                          Icons.catching_pokemon,
-                          color: Colors.redAccent,
+                        leading: Image.network(
+                          member['imageUrl']!,
+                          width: 40,
+                          height: 40,
                         ),
                         title: Text(
-                          member,
+                          member['name']!,
                           style: const TextStyle(fontSize: 18),
                         ),
                       ),
