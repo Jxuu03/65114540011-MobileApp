@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hello_app/page/detail.dart';
 import 'package:hello_app/page/playerSelection.dart';
+import 'package:hello_app/page/new.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -47,6 +48,11 @@ class _MyHomePageState extends State<MyHomePage> {
             ElevatedButton(
               onPressed: () => Get.to(() => TeamPage()),
               child: const Text("Go to Team Page"),
+            ),
+
+            ElevatedButton(
+              onPressed: () => Get.to(() => NewPage()),
+              child: const Text("Go to New Page"),
             ),
           ],
         ),
