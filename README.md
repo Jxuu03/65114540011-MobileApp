@@ -2,7 +2,9 @@
 **By Kamon Charoensri - 65114540011**
 
 **Feature**
-- Will be update later
+- Search Bar
+- EndDrawer for switching page
+- CRUD
 
 **How to Run**
 1. ```
