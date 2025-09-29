@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:pocketbase/pocketbase.dart';
-import 'package:http/http.dart' as http;
 
 class PocketBaseService {
   final pb = PocketBase('http://127.0.0.1:8090'); // your pocketbase URL
