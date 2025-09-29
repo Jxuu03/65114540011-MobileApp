@@ -2,15 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mcp_llm/mcp_llm.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-
-  // Debug log: ตรวจสอบว่า .env โหลดสำเร็จหรือไม่
-  print(
-    "DEBUG: dotenv loaded, CLAUDE_API_KEY = ${dotenv.env['CLAUDE_API_KEY']}",
-  );
-
   runApp(const MyApp());
 }
 
@@ -51,44 +45,33 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initializeLlm() async {
-    print("DEBUG: Initializing LLM...");
     _mcpLlm = McpLlm();
 
-    _mcpLlm.registerProvider('claude', ClaudeProviderFactory());
-    print("DEBUG: Registered provider 'claude'");
+    // เปลี่ยนเป็น OpenAI provider
+    _mcpLlm.registerProvider('openai', OpenAiProviderFactory());
 
-    final apiKey = dotenv.env['CLAUDE_API_KEY'] ?? '';
-    print("DEBUG: Loaded CLAUDE_API_KEY = $apiKey");
-
+    final apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     if (apiKey.isEmpty) {
       _showError('API key not found. Please check your .env file.');
       return;
     }
 
     try {
-      final client = await _mcpLlm.createClient(
-        providerName: 'claude',
+      _client = await _mcpLlm.createClient(
+        providerName: 'openai',
         config: LlmConfiguration(
           apiKey: apiKey,
-          model: 'claude-3-haiku-20240307',
+          model: 'gpt-4o-mini-2024-07-18', // โมเดลฟรีที่ OpenAI ให้ใช้ฟรี
           options: {'temperature': 0.7, 'max_tokens': 1500},
         ),
         systemPrompt: 'You are a helpful assistant. Be concise and friendly.',
       );
-
-      print("DEBUG: Client created successfully -> $client");
-
-      setState(() {
-        _client = client;
-      });
     } catch (e) {
-      print("DEBUG: Error creating client: $e");
       _showError('Failed to initialize AI: $e');
     }
   }
 
   void _showError(String message) {
-    print("DEBUG: ERROR -> $message");
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -105,7 +88,6 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     if (_client == null) {
-      print("DEBUG: _client is NULL when submitting message");
       _showError('AI client not initialized');
       setState(() {
         _isTyping = false;
@@ -114,16 +96,13 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      print("DEBUG: Sending message to AI -> $text");
       final response = await _client!.chat(text);
-      print("DEBUG: Got response from AI -> ${response.text}");
 
       setState(() {
         _messages.add(ChatMessage(text: response.text, isUser: false));
         _isTyping = false;
       });
     } catch (e) {
-      print("DEBUG: Error getting AI response: $e");
       _showError('Error getting AI response: $e');
       setState(() {
         _isTyping = false;
@@ -188,9 +167,7 @@ class _ChatScreenState extends State<ChatScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4.0),
               child: IconButton(
                 icon: const Icon(Icons.send),
-                onPressed: _client == null
-                    ? null
-                    : () => _handleSubmitted(_textController.text),
+                onPressed: () => _handleSubmitted(_textController.text),
               ),
             ),
           ],
