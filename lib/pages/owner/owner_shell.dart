@@ -42,7 +42,7 @@ class _OwnerShellState extends State<OwnerShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('👨‍💼 ร้านค้า - Food Builder Admin'),
+        title: const Text('👨‍💼 ร้านค้า'),
         backgroundColor: ownerPrimaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
