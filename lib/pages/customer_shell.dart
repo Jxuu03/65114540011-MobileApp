@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
+import '../services/pocketbase_service.dart';
 import '../builders/dynamic_order_builder.dart';
 import '../models/models.dart' as app_models;
-
 import 'order_summary_page.dart';
 
 class CustomerShell extends StatefulWidget {
@@ -16,39 +14,50 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int _selectedIndex = 0;
-  final FirestoreService firestore = FirestoreService();
-  final AuthService authService = AuthService();
+  // สร้าง Service instance ตามปกติ
+  final PocketBaseService _pocketbaseService = PocketBaseService();
 
-  // กำหนดสีหลักที่ใช้ทั่วทั้ง Shell
-  final Color primaryColor = Colors.orange.shade700; // สีหลัก
-  final Color accentColor = Colors.green.shade600; // สีเน้น (เช่น ราคา)
-  final Color addToCartButtonColor = Colors.blue.shade600; // สีปุ่ม Add to Cart
+  // --- การแก้ไข: สร้างตัวแปรสำหรับเก็บ Stream ---
+  late final Stream<List<app_models.MenuItem>> _menuStream;
+  late final Stream<List<app_models.OrderItem>> _cartStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // --- การแก้ไข: เรียกฟังก์ชันสร้าง Stream แค่ครั้งเดียวใน initState ---
+    _menuStream = _pocketbaseService.getMenuStream();
+    _cartStream = _pocketbaseService.getCartStream(widget.tableNumber);
+  }
+
+  final Color primaryColor = Colors.orange.shade700;
+  final Color accentColor = Colors.green.shade600;
+  final Color addToCartButtonColor = Colors.blue.shade600;
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<app_models.MenuItem>>(
-      stream: firestore.getMenuStream(),
-      builder: (context, snapshot) {
-        final menuItems = snapshot.data ?? [];
+      stream: _menuStream, // <--- การแก้ไข: ใช้ Stream จาก State
+      builder: (context, menuSnapshot) {
+        final menuItems = menuSnapshot.data ?? [];
 
         return StreamBuilder<List<app_models.OrderItem>>(
-          stream: firestore.getCartStream(widget.tableNumber),
+          stream: _cartStream, // <--- การแก้ไข: ใช้ Stream จาก State
           builder: (context, cartSnapshot) {
             final cartItems = cartSnapshot.data ?? [];
 
-            final List<Widget> _pages = <Widget>[
+            final List<Widget> pages = <Widget>[
               _buildMenuTab(context, menuItems),
               _buildCartTab(context, cartItems),
             ];
 
             return Scaffold(
               appBar: AppBar(
-                title: Text('โต๊ะ ${widget.tableNumber} - Food Builder'),
+                title: Text('โต๊ะ ${widget.tableNumber} - สั่งอาหาร'),
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 elevation: 4,
               ),
-              body: IndexedStack(index: _selectedIndex, children: _pages),
+              body: IndexedStack(index: _selectedIndex, children: pages),
               bottomNavigationBar: BottomNavigationBar(
                 items: [
                   const BottomNavigationBarItem(
@@ -56,7 +65,6 @@ class _CustomerShellState extends State<CustomerShell> {
                     label: 'เมนู',
                   ),
                   BottomNavigationBarItem(
-                    // Notification Badge
                     icon: Badge(
                       isLabelVisible: cartItems.isNotEmpty,
                       label: Text('${cartItems.length}'),
@@ -78,7 +86,7 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 
   // ------------------------------------
-  // --- 1. Menu Tab (ใช้ Card Style) ---
+  // --- 1. Menu Tab ---
   // ------------------------------------
   Widget _buildMenuTab(
     BuildContext context,
@@ -101,14 +109,11 @@ class _CustomerShellState extends State<CustomerShell> {
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(15),
-            onTap: () async {
-              await _showBuilderDialog(context, item);
-            },
+            onTap: () => _showBuilderDialog(context, item),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  // Placeholder Image / Icon Container
                   Container(
                     width: 70,
                     height: 70,
@@ -134,7 +139,6 @@ class _CustomerShellState extends State<CustomerShell> {
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 18,
-                            color: Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -157,7 +161,6 @@ class _CustomerShellState extends State<CustomerShell> {
                       ],
                     ),
                   ),
-                  // Add Button
                   Icon(Icons.add_circle_sharp, color: primaryColor, size: 35),
                 ],
               ),
@@ -169,7 +172,7 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 
   // ---------------------------------------
-  // --- 2. Cart Tab (ปรับปรุง Card Style) ---
+  // --- 2. Cart Tab ---
   // ---------------------------------------
   Widget _buildCartTab(
     BuildContext context,
@@ -182,23 +185,20 @@ class _CustomerShellState extends State<CustomerShell> {
         Expanded(
           child: cartItems.isEmpty
               ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.remove_shopping_cart,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'ตะกร้าว่างเปล่า! กรุณาเลือกเมนูที่ต้องการ',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.remove_shopping_cart,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'ตะกร้าว่างเปล่า!',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
                   ),
                 )
               : ListView.builder(
@@ -206,9 +206,7 @@ class _CustomerShellState extends State<CustomerShell> {
                   itemCount: cartItems.length,
                   itemBuilder: (context, index) {
                     final item = cartItems[index];
-                    // item.summary คือชื่อท็อปปิ้งทั้งหมดที่ถูกเลือก
                     final subtitleText = item.summary;
-
                     return Card(
                       elevation: 4,
                       margin: const EdgeInsets.symmetric(
@@ -217,13 +215,11 @@ class _CustomerShellState extends State<CustomerShell> {
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
-                        side: BorderSide(color: Colors.grey.shade200, width: 1),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Row(
                           children: [
-                            // Placeholder Icon
                             Container(
                               width: 50,
                               height: 50,
@@ -238,8 +234,6 @@ class _CustomerShellState extends State<CustomerShell> {
                               ),
                             ),
                             const SizedBox(width: 16),
-
-                            // Item Details
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,7 +243,6 @@ class _CustomerShellState extends State<CustomerShell> {
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 17,
-                                      color: Colors.black87,
                                     ),
                                   ),
                                   if (subtitleText.isNotEmpty &&
@@ -267,8 +260,6 @@ class _CustomerShellState extends State<CustomerShell> {
                                 ],
                               ),
                             ),
-
-                            // Price and Delete Button
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -285,10 +276,9 @@ class _CustomerShellState extends State<CustomerShell> {
                                     Icons.delete,
                                     color: Colors.red,
                                   ),
-                                  onPressed: () async {
+                                  onPressed: () {
                                     if (item.id != null) {
-                                      await firestore.removeFromCart(
-                                        widget.tableNumber,
+                                      _pocketbaseService.removeFromCart(
                                         item.id!,
                                       );
                                     }
@@ -303,13 +293,10 @@ class _CustomerShellState extends State<CustomerShell> {
                   },
                 ),
         ),
-
-        // Floating Action Bar (Total & Place Order)
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
             boxShadow: [
               BoxShadow(
                 color: Colors.grey.withOpacity(0.3),
@@ -317,11 +304,11 @@ class _CustomerShellState extends State<CustomerShell> {
                 offset: const Offset(0, -5),
               ),
             ],
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ราคารวม
               Text(
                 'ยอดรวม: ฿${total.toStringAsFixed(2)}',
                 style: TextStyle(
@@ -330,7 +317,6 @@ class _CustomerShellState extends State<CustomerShell> {
                   color: primaryColor,
                 ),
               ),
-              // ปุ่มยืนยันคำสั่งซื้อ
               ElevatedButton.icon(
                 icon: const Icon(Icons.send, color: Colors.white),
                 label: const Text(
@@ -341,14 +327,13 @@ class _CustomerShellState extends State<CustomerShell> {
                     ? null
                     : () async {
                         try {
-                          final now = DateTime.now();
-                          final order = app_models.Order(
+                          final summaryOrder = app_models.Order(
                             tableNumber: widget.tableNumber,
-                            orderTimestamp: now,
+                            orderTimestamp: DateTime.now(),
                             totalAmount: total,
                             items: cartItems.map((e) => e.toMap()).toList(),
                           );
-                          await firestore.placeOrder(
+                          await _pocketbaseService.placeOrder(
                             widget.tableNumber,
                             cartItems,
                           );
@@ -357,7 +342,7 @@ class _CustomerShellState extends State<CustomerShell> {
                             context,
                             MaterialPageRoute(
                               builder: (context) =>
-                                  OrderSummaryPage(order: order),
+                                  OrderSummaryPage(order: summaryOrder),
                             ),
                           );
                         } catch (e) {
@@ -376,7 +361,6 @@ class _CustomerShellState extends State<CustomerShell> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  elevation: 5,
                 ),
               ),
             ],
@@ -394,7 +378,7 @@ class _CustomerShellState extends State<CustomerShell> {
     final builder = DynamicOrderBuilder(
       menuItem: item,
       tableNumber: widget.tableNumber,
-      firestoreService: firestore,
+      pocketbaseService: _pocketbaseService, // ส่ง service ที่มีอยู่แล้วเข้าไป
       primaryColor: primaryColor,
       addToCartButtonColor: addToCartButtonColor,
     );

@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../services/firestore_service.dart';
+import '../../services/pocketbase_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/models.dart';
 import 'menu_editor_page.dart';
@@ -15,31 +15,43 @@ class OwnerShell extends StatefulWidget {
 class _OwnerShellState extends State<OwnerShell> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
-  final FirestoreService _firestoreService = FirestoreService();
+  final PocketBaseService _pocketbaseService = PocketBaseService();
+
+  late final Stream<List<Order>> _ordersStream;
+  late final Stream<List<MenuItem>> _menuStream;
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _ordersStream = _pocketbaseService.getOrdersStream();
+    _menuStream = _pocketbaseService.getMenuStream();
+
+    _pages = <Widget>[
+      OwnerMenuManagementTab(
+        pocketbaseService: _pocketbaseService,
+        menuStream: _menuStream,
+        primaryColor: ownerPrimaryColor,
+        accentColor: accentColor,
+      ),
+      // ส่ง Stream เข้าไปใน Tab ตามปกติ
+      OwnerOrderViewerTab(
+        pocketbaseService: _pocketbaseService,
+        ordersStream: _ordersStream,
+        accentColor: accentColor,
+      ),
+    ];
+  }
 
   void _logout() async {
     await _authService.signOut();
   }
 
-  // กำหนดสีหลักสำหรับแอดมิน
   final Color ownerPrimaryColor = Colors.red.shade700;
   final Color accentColor = Colors.green.shade600;
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      // ส่งสีหลักและสีเน้นเข้าไปใน Tab จัดการเมนู
-      OwnerMenuManagementTab(
-        firestoreService: _firestoreService,
-        primaryColor: ownerPrimaryColor, // ส่งสีหลัก
-        accentColor: accentColor, // ส่งสีเน้น
-      ),
-      OwnerOrderViewerTab(
-        firestoreService: _firestoreService,
-        accentColor: accentColor,
-      ),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('👨‍💼 ร้านค้า'),
@@ -54,24 +66,21 @@ class _OwnerShellState extends State<OwnerShell> {
           ),
         ],
       ),
-      body: pages[_selectedIndex],
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: BottomNavigationBar(
         items: [
           const BottomNavigationBarItem(
             icon: Icon(Icons.restaurant_menu),
             label: 'จัดการเมนู',
           ),
-          // **Badge: นับเฉพาะออเดอร์ที่รอดำเนินการ**
           BottomNavigationBarItem(
             icon: StreamBuilder<List<Order>>(
-              stream: _firestoreService.getOrdersStream(),
+              stream: _ordersStream,
               builder: (context, snapshot) {
                 final orders = snapshot.data ?? [];
-                // กรองเฉพาะรายการที่ isCompleted เป็น false
                 final pendingCount = orders
                     .where((order) => !order.isCompleted)
                     .length;
-
                 return Badge(
                   isLabelVisible: pendingCount > 0,
                   label: Text('$pendingCount'),
@@ -95,7 +104,7 @@ class _OwnerShellState extends State<OwnerShell> {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      MenuEditorPage(firestoreService: _firestoreService),
+                      MenuEditorPage(pocketbaseService: _pocketbaseService),
                 ),
               ),
               child: const Icon(Icons.add),
@@ -106,16 +115,18 @@ class _OwnerShellState extends State<OwnerShell> {
 }
 
 // ----------------------------------------------------
-// *** 1. Owner Menu Management Tab (ปรับปรุง Card Style) ***
+// *** 1. Owner Menu Management Tab ***
 // ----------------------------------------------------
 class OwnerMenuManagementTab extends StatelessWidget {
-  final FirestoreService firestoreService;
-  final Color primaryColor; // สีหลัก
-  final Color accentColor; // สีเน้น
+  final PocketBaseService pocketbaseService;
+  final Stream<List<MenuItem>> menuStream; // <--- รับ Stream
+  final Color primaryColor;
+  final Color accentColor;
 
   const OwnerMenuManagementTab({
     super.key,
-    required this.firestoreService,
+    required this.pocketbaseService,
+    required this.menuStream,
     required this.primaryColor,
     required this.accentColor,
   });
@@ -123,10 +134,10 @@ class OwnerMenuManagementTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<MenuItem>>(
-      stream: firestoreService.getMenuStream(),
+      stream: menuStream, // <--- ใช้ Stream ที่รับเข้ามา
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text("โหลดเมนูล้มเหลว"));
+          return Center(child: Text("โหลดเมนูล้มเหลว: ${snapshot.error}"));
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -141,7 +152,6 @@ class OwnerMenuManagementTab extends StatelessWidget {
           itemCount: menuItems.length,
           itemBuilder: (context, index) {
             final item = menuItems[index];
-
             return Card(
               elevation: 6,
               margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -152,7 +162,6 @@ class OwnerMenuManagementTab extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    // Placeholder Icon Container
                     Container(
                       width: 60,
                       height: 60,
@@ -169,7 +178,6 @@ class OwnerMenuManagementTab extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 16),
-
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +187,6 @@ class OwnerMenuManagementTab extends StatelessWidget {
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,
-                              color: Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -203,30 +210,24 @@ class OwnerMenuManagementTab extends StatelessWidget {
                         ],
                       ),
                     ),
-
-                    // Action Buttons (Edit & Delete)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // ปุ่มแก้ไข
                         IconButton(
                           icon: const Icon(Icons.edit, color: Colors.blue),
                           onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => MenuEditorPage(
-                                firestoreService: firestoreService,
+                                pocketbaseService: pocketbaseService,
                                 menuItem: item,
                               ),
                             ),
                           ),
-                          tooltip: 'แก้ไขเมนู',
                         ),
-                        // ปุ่มลบ
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _confirmDelete(context, item),
-                          tooltip: 'ลบเมนู',
                         ),
                       ],
                     ),
@@ -240,15 +241,12 @@ class OwnerMenuManagementTab extends StatelessWidget {
     );
   }
 
-  // Dialog ยืนยันการลบ
   void _confirmDelete(BuildContext context, MenuItem item) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ยืนยันการลบ'),
-        content: Text(
-          'คุณแน่ใจหรือไม่ที่จะลบเมนู "${item.name}" ออกจากรายการ?',
-        ),
+        content: Text('คุณแน่ใจหรือไม่ที่จะลบเมนู "${item.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -256,11 +254,10 @@ class OwnerMenuManagementTab extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              firestoreService.removeMenuItem(item.id);
+              if (item.id != null) {
+                pocketbaseService.removeMenuItem(item.id!);
+              }
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('ลบเมนู "${item.name}" แล้ว')),
-              );
             },
             child: const Text('ลบ', style: TextStyle(color: Colors.red)),
           ),
@@ -271,64 +268,53 @@ class OwnerMenuManagementTab extends StatelessWidget {
 }
 
 // ----------------------------------------------------
-// *** 2. Owner Order Viewer Tab (ไม่มีการเปลี่ยนแปลงหลักจากครั้งก่อน) ***
+// *** 2. Owner Order Viewer Tab (ใช้ UI ที่คุณต้องการ) ***
 // ----------------------------------------------------
 class OwnerOrderViewerTab extends StatelessWidget {
-  final FirestoreService firestoreService;
+  final PocketBaseService pocketbaseService;
+  final Stream<List<Order>> ordersStream; // <--- การแก้ไข: เพิ่มพารามิเตอร์นี้
   final Color accentColor;
+
   const OwnerOrderViewerTab({
     super.key,
-    required this.firestoreService,
+    required this.pocketbaseService,
+    required this.ordersStream, // <--- การแก้ไข: เพิ่มพารามิเตอร์นี้
     required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Order>>(
-      stream: firestoreService.getOrdersStream(),
+      stream: ordersStream, // <--- การแก้ไข: ใช้ Stream ที่รับเข้ามา
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text("โหลดคำสั่งซื้อล้มเหลว"));
-        }
-        if (!snapshot.hasData) {
+        if (snapshot.hasError)
+          return Center(
+            child: Text("โหลดคำสั่งซื้อล้มเหลว: ${snapshot.error}"),
+          );
+        if (!snapshot.hasData)
           return const Center(child: CircularProgressIndicator());
-        }
 
         final orders = snapshot.data!;
-
-        // เรียงลำดับให้ออเดอร์ที่ยังไม่เสร็จอยู่ด้านบน
         orders.sort((a, b) {
-          if (a.isCompleted == b.isCompleted) {
-            return b.orderTimestamp.compareTo(
-              a.orderTimestamp,
-            ); // เรียงตามเวลาล่าสุด
-          }
-          return a.isCompleted
-              ? 1
-              : -1; // -1: a ขึ้นก่อน (a ยังไม่เสร็จ), 1: b ขึ้นก่อน (a เสร็จแล้ว)
+          if (a.isCompleted == b.isCompleted)
+            return b.orderTimestamp.compareTo(a.orderTimestamp);
+          return a.isCompleted ? 1 : -1;
         });
 
-        if (orders.isEmpty) {
-          return const Center(
-            child: Text(
-              'ไม่มีรายการสั่งซื้อ',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-          );
-        }
+        if (orders.isEmpty)
+          return const Center(child: Text('ไม่มีรายการสั่งซื้อ'));
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: orders.length,
           itemBuilder: (context, index) {
             final order = orders[index];
+            final localTimestamp = order.orderTimestamp.toLocal();
             final time =
-                "${order.orderTimestamp.hour.toString().padLeft(2, '0')}:${order.orderTimestamp.minute.toString().padLeft(2, '0')}";
-
-            // กำหนดสีของ Card ตามสถานะ
+                "${localTimestamp.hour.toString().padLeft(2, '0')}:${localTimestamp.minute.toString().padLeft(2, '0')}";
             final cardColor = order.isCompleted
                 ? Colors.grey.shade50
-                : Colors.red.shade50; // สีแดงอ่อนสำหรับรายการที่ยังไม่เสร็จ
+                : Colors.red.shade50;
 
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -349,91 +335,59 @@ class OwnerOrderViewerTab extends StatelessWidget {
                   vertical: 8,
                 ),
                 title: Text(
-                  'Order: ${order.id.substring(0, min(8, order.id.length))} (โต๊ะ: ${order.tableNumber})',
+                  'Order: ${order.id?.substring(0, min(8, order.id?.length ?? 0))} (โต๊ะ: ${order.tableNumber})',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                     color: order.isCompleted
                         ? Colors.black54
-                        : Colors
-                              .red
-                              .shade700, // สีเข้มขึ้นสำหรับรายการที่รอดำเนินการ
+                        : Colors.red.shade700,
                   ),
                 ),
                 subtitle: Text(
                   'เวลาสั่ง: $time | สถานะ: ${order.isCompleted ? "เสร็จสิ้น" : "รอดำเนินการ"}',
-                  style: TextStyle(
-                    color: order.isCompleted
-                        ? Colors.grey.shade600
-                        : Colors.black87,
-                  ),
                 ),
-                // ปุ่มเสร็จสิ้น/สถานะ
                 trailing: order.isCompleted
                     ? Icon(Icons.check_circle, color: accentColor, size: 30)
                     : ElevatedButton(
                         onPressed: () async {
-                          await firestoreService.completeOrder(order.id);
+                          if (order.id != null) {
+                            await pocketbaseService.completeOrder(order.id!);
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accentColor,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 15,
-                            vertical: 8,
-                          ),
+                          foregroundColor: Colors.white, // ทำให้ text เป็นสีขาว
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          elevation: 3,
                         ),
-                        child: const Text(
-                          'ทำเสร็จ',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: const Text('ทำเสร็จ'),
                       ),
                 children: [
                   const Divider(height: 1, thickness: 1),
                   ...order.items.map<Widget>((item) {
-                    final name = item['name'] ?? 'Unknown';
-                    final price = (item['price'] as num?)?.toDouble() ?? 0.0;
-                    final toppings = List<String>.from(item['toppings'] ?? []);
-
-                    String subtitleText = toppings.isNotEmpty
-                        ? 'ตัวเลือก: ${toppings.join(", ")}'
-                        : '';
-                    final hasOptions = toppings.isNotEmpty;
-
                     return ListTile(
                       leading: const Icon(
                         Icons.local_dining,
                         color: Colors.blueGrey,
                       ),
                       title: Text(
-                        name,
+                        item['name'] ?? 'Unknown',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: hasOptions ? Text(subtitleText) : null,
+                      subtitle:
+                          (item['summary'] != null &&
+                              (item['summary'] as String).isNotEmpty &&
+                              item['summary'] != 'ไม่ระบุตัวเลือก')
+                          ? Text(item['summary'])
+                          : null,
                       trailing: Text(
-                        '฿${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: hasOptions ? 4 : 8,
+                        '฿${(item['price'] as num? ?? 0.0).toStringAsFixed(2)}',
                       ),
                     );
                   }).toList(),
-
                   const Divider(height: 1, thickness: 1.5),
-
-                  // --- Total Amount ---
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
@@ -447,7 +401,7 @@ class OwnerOrderViewerTab extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '฿${order.items.fold<double>(0.0, (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0.0)).toStringAsFixed(2)}',
+                          '฿${order.totalAmount.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,

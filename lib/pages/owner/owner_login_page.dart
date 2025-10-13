@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 
 class OwnerLoginPage extends StatefulWidget {
@@ -16,7 +15,6 @@ class _OwnerLoginPageState extends State<OwnerLoginPage> {
   String _errorMessage = '';
   bool _isLoading = false;
 
-  // ใช้ AuthService ที่เราสร้างไว้
   final AuthService _authService = AuthService();
 
   @override
@@ -40,46 +38,21 @@ class _OwnerLoginPageState extends State<OwnerLoginPage> {
         _passwordController.text,
       );
 
-      // ถ้า login สำเร็จ AuthWrapper ที่อยู่ชั้นบนจะจัดการ navigation ให้
-      // แต่ถ้าหน้านี้ถูก push มาแบบ modal/pop-able เราก็ปิดหน้า login ทันที
       if (!mounted) return;
-      setState(() => _isLoading = false);
-
+      // Pop a screen when login is successful, AuthWrapper will handle the rest.
       Navigator.of(context).pop();
-    } on FirebaseAuthException catch (e) {
-      String friendly;
-      switch (e.code) {
-        case 'user-not-found':
-          friendly = 'ไม่พบบัญชีผู้ใช้ โปรดตรวจสอบอีเมล';
-          break;
-        case 'wrong-password':
-          friendly = 'รหัสผ่านไม่ถูกต้อง';
-          break;
-        case 'invalid-email':
-          friendly = 'รูปแบบอีเมลไม่ถูกต้อง';
-          break;
-        case 'user-disabled':
-          friendly = 'บัญชีถูกระงับ โปรดติดต่อผู้ดูแลระบบ';
-          break;
-        default:
-          friendly = e.message ?? 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
-      }
-      setState(() {
-        _errorMessage = 'เข้าสู่ระบบล้มเหลว: $friendly';
-        _isLoading = false;
-      });
-      debugPrint('Owner login error (${e.code}): ${e.message}');
     } catch (e) {
       setState(() {
-        _errorMessage = 'เกิดข้อผิดพลาด: ${e.toString()}';
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
       });
-      debugPrint('Owner login unexpected error: $e');
+      debugPrint('Owner login error: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ... UI Code ไม่มีการเปลี่ยนแปลง ...
     return Scaffold(
       appBar: AppBar(
         title: const Text('เข้าสู่ระบบสำหรับร้านค้า'),

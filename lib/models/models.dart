@@ -1,8 +1,33 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'package:uuid/uuid.dart';
 
 const uuid = Uuid();
 
+// --- User Model (รวมจาก app_user.dart) ---
+class AppUser {
+  final String uid;
+  final String email;
+  final String name;
+  final String role;
+
+  AppUser({
+    required this.uid,
+    required this.email,
+    required this.name,
+    required this.role,
+  });
+
+  factory AppUser.fromRecord(RecordModel record) {
+    return AppUser(
+      uid: record.id,
+      email: record.data['email']?.toString() ?? '',
+      name: record.data['name'] ?? '',
+      role: record.data['role'] ?? 'customer',
+    );
+  }
+}
+
+// --- Topping Option ---
 class ToppingOption {
   final String name;
   final double price;
@@ -27,26 +52,26 @@ class ToppingOption {
   }
 }
 
-// --- 2. Menu Item Model ---
+// --- Menu Item Model ---
 class MenuItem {
-  final String id;
+  final String? id;
   final String name;
   final double basePrice;
-  final String type; // 'Food' หรือ 'Drink'
+  final String type;
   final List<ToppingOption> customizationOptions;
 
   MenuItem({
-    String? id,
+    this.id,
     required this.name,
     required this.basePrice,
     required this.type,
     this.customizationOptions = const [],
-  }) : id = id ?? uuid.v4();
+  });
 
-  factory MenuItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory MenuItem.fromRecord(RecordModel record) {
+    final data = record.toJson();
     return MenuItem(
-      id: doc.id,
+      id: record.id,
       name: data['name'] ?? '',
       basePrice: (data['basePrice'] ?? 0.0).toDouble(),
       type: data['type'] ?? 'Food',
@@ -70,7 +95,7 @@ class MenuItem {
   }
 }
 
-// --- 3. Order Item Model ---
+// --- Order Item Model ---
 class OrderItem {
   final String? id;
   final String name;
@@ -90,27 +115,16 @@ class OrderItem {
     DateTime? addedAt,
   }) : addedAt = addedAt ?? DateTime.now();
 
-  factory OrderItem.fromMap(Map<String, dynamic> map) {
+  factory OrderItem.fromRecord(RecordModel record) {
+    final data = record.toJson();
     return OrderItem(
-      name: map['name'] ?? '',
-      price: (map['price'] ?? 0.0).toDouble(),
-      summary: map['summary'] ?? 'ไม่ระบุตัวเลือก',
-      selections: Map<String, String>.from(map['selections'] ?? {}),
-      toppings: List<String>.from(map['toppings'] ?? []),
-      addedAt: (map['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    );
-  }
-
-  factory OrderItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return OrderItem(
-      id: doc.id,
+      id: record.id,
       name: data['name'] ?? '',
       price: (data['price'] ?? 0.0).toDouble(),
       summary: data['summary'] ?? 'ไม่ระบุตัวเลือก',
       selections: Map<String, String>.from(data['selections'] ?? {}),
       toppings: List<String>.from(data['toppings'] ?? []),
-      addedAt: (data['addedAt'] as Timestamp).toDate(),
+      addedAt: DateTime.tryParse(record.created) ?? DateTime.now(),
     );
   }
 
@@ -125,20 +139,13 @@ class OrderItem {
   }
 
   Map<String, dynamic> toCartMap() {
-    return {
-      'name': name,
-      'price': price,
-      'summary': summary,
-      'selections': selections,
-      'toppings': toppings,
-      'addedAt': Timestamp.now(),
-    };
+    return toMap(); // PocketBase's `created` field will handle timestamp automatically
   }
 }
 
-// --- 4. Order Model ---
+// --- Order Model ---
 class Order {
-  final String id;
+  final String? id;
   final String tableNumber;
   final DateTime orderTimestamp;
   final double totalAmount;
@@ -146,20 +153,21 @@ class Order {
   final bool isCompleted;
 
   Order({
-    String? id,
+    this.id,
     required this.tableNumber,
     required this.orderTimestamp,
     required this.totalAmount,
     required this.items,
     this.isCompleted = false,
-  }) : id = id ?? uuid.v4();
+  });
 
-  factory Order.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Order.fromRecord(RecordModel record) {
+    final data = record.toJson();
     return Order(
-      id: doc.id,
+      id: record.id,
       tableNumber: data['tableNumber'] ?? 'Unknown',
-      orderTimestamp: (data['orderTimestamp'] as Timestamp).toDate(),
+      orderTimestamp:
+          DateTime.tryParse(data['orderTimestamp'] ?? '') ?? DateTime.now(),
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
       items: List<Map<String, dynamic>>.from(data['items'] ?? []),
       isCompleted: data['isCompleted'] ?? false,
@@ -169,7 +177,7 @@ class Order {
   Map<String, dynamic> toMap() {
     return {
       'tableNumber': tableNumber,
-      'orderTimestamp': Timestamp.fromDate(orderTimestamp),
+      'orderTimestamp': orderTimestamp.toIso8601String(),
       'totalAmount': totalAmount,
       'items': items,
       'isCompleted': isCompleted,

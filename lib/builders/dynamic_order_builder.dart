@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
-import '../services/firestore_service.dart';
+import '../services/pocketbase_service.dart'; // เปลี่ยน
 
 class DynamicOrderBuilder extends StatefulWidget {
   final MenuItem menuItem;
   final String tableNumber;
-  final FirestoreService firestoreService;
-  // เพิ่ม properties สำหรับสี
+  final PocketBaseService pocketbaseService; // เปลี่ยน
   final Color primaryColor;
   final Color addToCartButtonColor;
 
@@ -14,7 +13,7 @@ class DynamicOrderBuilder extends StatefulWidget {
     super.key,
     required this.menuItem,
     required this.tableNumber,
-    required this.firestoreService,
+    required this.pocketbaseService, // เปลี่ยน
     required this.primaryColor,
     required this.addToCartButtonColor,
   });
@@ -24,19 +23,16 @@ class DynamicOrderBuilder extends StatefulWidget {
 }
 
 class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
-  // State: เก็บตัวเลือกที่ถูกเลือก (Category -> ToppingOption)
+  // ... state variables and initState are unchanged ...
   final Map<String, ToppingOption> _selectedOptions = {};
   double _currentPrice = 0.0;
   late final Map<String, List<ToppingOption>> _groupedOptions;
-
   bool get _hasCustomizationOptions => _groupedOptions.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     _currentPrice = widget.menuItem.basePrice;
-
-    // จัดกลุ่มตัวเลือกทั้งหมดตาม Category
     _groupedOptions = {};
     for (var opt in widget.menuItem.customizationOptions) {
       if (opt.category.isNotEmpty) {
@@ -45,59 +41,59 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
     }
   }
 
-  // Logic: คำนวณราคารวม
+  // ... _calculatePrice, _handleOptionTap methods are unchanged ...
   void _calculatePrice() {
     double price = widget.menuItem.basePrice;
-    _selectedOptions.values.forEach((opt) {
+    for (var opt in _selectedOptions.values) {
       price += opt.price;
-    });
+    }
     setState(() {
       _currentPrice = price;
     });
   }
 
-  // Logic: จัดการการเลือก (บังคับ Single Selection)
   void _handleOptionTap(ToppingOption option) {
     setState(() {
       final category = option.category;
       final isSelected = _selectedOptions[category]?.name == option.name;
 
       if (isSelected) {
-        _selectedOptions.remove(category); // ยกเลิกการเลือก
+        _selectedOptions.remove(category);
       } else {
-        _selectedOptions[category] = option; // เลือกใหม่
+        _selectedOptions[category] = option;
       }
       _calculatePrice();
     });
   }
 
-  // Logic: เพิ่มลงในตะกร้าและปิด Modal
   void _addToCart() async {
-    // 1. สร้าง OrderItem: ใช้ Logic ที่ง่ายขึ้นสำหรับ summary
     final selectedNames = _selectedOptions.values.map((e) => e.name).toList();
-
-    // Summary แสดงแค่ชื่อตัวเลือกที่ถูกเลือกทั้งหมด (ตามที่ผู้ใช้ร้องขอ)
     final summary = selectedNames.join(', ');
-
-    // selections: Map<Category, Name> (เผื่อไว้)
     final selectionsMap = _selectedOptions.map(
       (key, value) => MapEntry(key, value.name),
     );
 
     final orderItem = OrderItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: widget.menuItem.name,
       price: _currentPrice,
       summary: summary.isEmpty ? 'ไม่ระบุตัวเลือก' : summary,
       selections: selectionsMap,
-      toppings:
-          selectedNames, // ใส่ทั้งหมดใน toppings เพื่อให้ Owner/Summary Page ดึงไปใช้ได้ง่าย
+      toppings: selectedNames,
     );
 
     try {
-      await widget.firestoreService.addToCart(widget.tableNumber, orderItem);
+      await widget.pocketbaseService.addToCart(
+        widget.tableNumber,
+        orderItem,
+      ); // เปลี่ยน
       if (mounted) {
         Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เพิ่มลงตะกร้าเรียบร้อย!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -112,9 +108,9 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
 
   @override
   Widget build(BuildContext context) {
+    // ... UI Code ไม่มีการเปลี่ยนแปลง ...
     return Column(
       children: [
-        // Modal Header (Item Name) - UI Improvement
         Container(
           padding: const EdgeInsets.only(
             top: 10,
@@ -155,17 +151,11 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
             ],
           ),
         ),
-
-        // Options List (ส่วนหลักของการเลือก)
         Expanded(
           child: _hasCustomizationOptions
               ? ListView(
-                  // มีตัวเลือก: แสดงรายการตัวเลือก
                   padding: const EdgeInsets.all(16),
                   children: _groupedOptions.entries.map((entry) {
-                    final category = entry.key;
-                    final options = entry.value;
-
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -173,18 +163,16 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Text(
-                            '${category} (เลือก 1 อย่าง)',
+                            '${entry.key} (เลือก 1 อย่าง)',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
                             ),
                           ),
                         ),
-                        // Radio Button Style List: บังคับเลือก 1 ตัวเลือกต่อ Category
-                        ...options.map((option) {
+                        ...entry.value.map((option) {
                           final isSelected =
-                              _selectedOptions[category]?.name == option.name;
+                              _selectedOptions[entry.key]?.name == option.name;
                           return Card(
                             elevation: isSelected ? 4 : 1,
                             margin: const EdgeInsets.only(bottom: 8),
@@ -228,7 +216,6 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
                   }).toList(),
                 )
               : const Center(
-                  // ไม่มีตัวเลือก: แสดงข้อความแจ้ง
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
                     child: Column(
@@ -237,7 +224,7 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
                         Icon(Icons.info_outline, size: 40, color: Colors.grey),
                         SizedBox(height: 10),
                         Text(
-                          'เมนูนี้ไม่มีตัวเลือกการปรับแต่งเพิ่มเติม',
+                          'เมนูนี้ไม่มีตัวเลือกการปรับแต่ง',
                           style: TextStyle(fontSize: 18, color: Colors.grey),
                         ),
                       ],
@@ -245,8 +232,6 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
                   ),
                 ),
         ),
-
-        // Floating Action Bar (ปุ่ม 'เพิ่มลงในตะกร้า') - Functional
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -263,7 +248,6 @@ class _DynamicOrderBuilderState extends State<DynamicOrderBuilder> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ราคารวม (อัพเดทอัตโนมัติ)
               Text(
                 'ราคารวม: ฿${_currentPrice.toStringAsFixed(2)}',
                 style: TextStyle(

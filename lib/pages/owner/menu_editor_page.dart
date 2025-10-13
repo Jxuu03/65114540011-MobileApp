@@ -1,16 +1,15 @@
-// lib/pages/owner/menu_editor_page.dart
 import 'package:flutter/material.dart';
-import '../../services/firestore_service.dart';
+import '../../services/pocketbase_service.dart'; // เปลี่ยน
 import '../../models/models.dart';
 
 class MenuEditorPage extends StatefulWidget {
   final MenuItem? menuItem;
-  final FirestoreService firestoreService;
+  final PocketBaseService pocketbaseService; // เปลี่ยน
 
   const MenuEditorPage({
     super.key,
     this.menuItem,
-    required this.firestoreService,
+    required this.pocketbaseService, // เปลี่ยน
   });
 
   @override
@@ -19,12 +18,11 @@ class MenuEditorPage extends StatefulWidget {
 
 class _MenuEditorPageState extends State<MenuEditorPage> {
   final _formKey = GlobalKey<FormState>();
+  // ... controllers and state variables are unchanged ...
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   String _itemType = 'Drink';
   List<ToppingOption> _customizationOptions = [];
-
-  // Controllers สำหรับ topping
   final _toppingNameController = TextEditingController();
   final _toppingPriceController = TextEditingController();
   String _toppingCategory = 'Size';
@@ -40,6 +38,7 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
     }
   }
 
+  // ... dispose, _addTopping, _removeTopping methods are unchanged ...
   @override
   void dispose() {
     _nameController.dispose();
@@ -72,7 +71,7 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
   void _saveItem() async {
     if (_formKey.currentState!.validate()) {
       final newItem = MenuItem(
-        id: widget.menuItem?.id,
+        id: widget.menuItem?.id, // ส่ง id เดิมไปด้วยถ้าเป็นการแก้ไข
         name: _nameController.text,
         basePrice: double.tryParse(_priceController.text) ?? 0.0,
         type: _itemType,
@@ -80,7 +79,7 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
       );
 
       try {
-        await widget.firestoreService.saveMenuItem(newItem);
+        await widget.pocketbaseService.saveMenuItem(newItem); // เปลี่ยน
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -97,7 +96,7 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาดในการบันทึกเมนู: $e'),
+            content: Text('เกิดข้อผิดพลาด: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -107,6 +106,7 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ... UI Code ไม่มีการเปลี่ยนแปลง ...
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.menuItem == null ? 'เพิ่มเมนูใหม่' : 'แก้ไขเมนู'),
@@ -120,12 +120,10 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- ชื่อและราคา (ปรับปรุง UI TextField) ---
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'ชื่อเมนู',
-                  // **UI Improvement: OutlineInputBorder**
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(10)),
                   ),
@@ -139,7 +137,6 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
                 controller: _priceController,
                 decoration: const InputDecoration(
                   labelText: 'ราคาพื้นฐาน (฿)',
-                  // **UI Improvement: OutlineInputBorder**
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(10)),
                   ),
@@ -171,7 +168,6 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
                 },
               ),
               const Divider(height: 40, thickness: 2),
-              // --- ตัวเลือก customization ---
               Text(
                 'ตัวเลือกการปรับแต่ง',
                 style: Theme.of(
@@ -179,7 +175,6 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              // *** New Topping Input Fields ***
               Row(
                 children: [
                   Expanded(
@@ -217,11 +212,19 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
                         labelText: 'หมวดหมู่',
                         border: OutlineInputBorder(),
                       ),
-                      items: const ['Size', 'Milk', 'Temperature', 'Topping']
-                          .map(
-                            (c) => DropdownMenuItem(value: c, child: Text(c)),
-                          )
-                          .toList(),
+                      items:
+                          const [
+                                'Size',
+                                'Milk',
+                                'Temperature',
+                                'Topping',
+                                'Protein',
+                              ]
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
                       onChanged: (value) {
                         if (value != null)
                           setState(() => _toppingCategory = value);
@@ -250,60 +253,60 @@ class _MenuEditorPageState extends State<MenuEditorPage> {
                 ],
               ),
               const SizedBox(height: 20),
-              if (_customizationOptions.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ตัวเลือกปัจจุบัน (${_customizationOptions.length})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+              _customizationOptions.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ตัวเลือกปัจจุบัน (${_customizationOptions.length})',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _customizationOptions.length,
+                          itemBuilder: (context, index) {
+                            final option = _customizationOptions[index];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              elevation: 1,
+                              child: ListTile(
+                                title: Text(
+                                  '${option.name} (+฿${option.price.toStringAsFixed(2)})',
+                                ),
+                                subtitle: Text(
+                                  'หมวดหมู่: ${option.category}',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _removeTopping(index),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    )
+                  : const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text('ยังไม่มีตัวเลือกการปรับแต่ง'),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _customizationOptions.length,
-                      itemBuilder: (context, index) {
-                        final option = _customizationOptions[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          elevation: 1,
-                          child: ListTile(
-                            title: Text(
-                              '${option.name} (+฿${option.price.toStringAsFixed(2)})',
-                            ),
-                            subtitle: Text(
-                              'หมวดหมู่: ${option.category}',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removeTopping(index),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                )
-              else
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text('ยังไม่มีตัวเลือกการปรับแต่ง'),
-                  ),
-                ),
               const SizedBox(height: 40),
               Center(
                 child: ElevatedButton(
                   onPressed: _saveItem,
-                  // **UI Improvement: Change Save Button Color**
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Colors.green.shade600, // เปลี่ยนเป็นสีเขียว
+                    backgroundColor: Colors.green.shade600,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 50,
                       vertical: 15,
