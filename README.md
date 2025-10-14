@@ -10,7 +10,8 @@
 1. ```
    pocketbase serve
    ```
-2. ```
+2. ในโฟลเดอร์ /pocketbase-faker/ รันคำสั่ง
+  ```
    node seed.mjs
    ```
 
